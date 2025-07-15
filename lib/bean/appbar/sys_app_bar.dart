@@ -52,7 +52,20 @@ class SysAppBar extends StatelessWidget implements PreferredSizeWidget {
       acs.addAll(actions!);
     }
     if (Utils.isDesktop()) {
-      // acs.add(IconButton(onPressed: () => windowManager.minimize(), icon: const Icon(Icons.minimize)));
+      acs.add(IconButton(
+          onPressed: () {
+            windowManager.restore();
+            windowManager.setSize(const Size(1280, 860));
+            windowManager.center();
+            windowManager.show();
+          },
+          icon: const Icon(Icons.copy_all)));
+      acs.add(IconButton(
+          onPressed: () {
+            windowManager.maximize();
+            windowManager.show();
+          },
+          icon: const Icon(Icons.crop_square)));
       if (!showWindowButton()) {
         acs.add(CloseButton(onPressed: () => windowManager.close()));
       }
