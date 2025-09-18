@@ -16,7 +16,6 @@ import 'package:kazumi/utils/storage.dart';
 import 'package:logger/logger.dart';
 import 'package:kazumi/utils/logger.dart';
 import 'package:kazumi/utils/utils.dart';
-import 'package:flutter/services.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/shaders/shaders_controller.dart';
 import 'package:kazumi/utils/syncplay.dart';
@@ -116,6 +115,7 @@ abstract class _PlayerController with Store {
   Box setting = GStorage.setting;
   bool hAenable = true;
   late String hardwareDecoder;
+  bool androidEnableOpenSLES = true;
   bool lowMemoryMode = false;
   bool autoPlay = true;
   bool playerDebugMode = false;
@@ -181,17 +181,12 @@ abstract class _PlayerController with Store {
     if (episodeFromTitle == 0) {
       episodeFromTitle = videoPageController.currentEpisode;
     }
-
-    List<String> titleList = [
-      videoPageController.title,
-      videoPageController.bangumiItem.nameCn,
-      videoPageController.bangumiItem.name
-    ].where((title) => title.isNotEmpty).toList();
-    // 根据标题列表获取弹幕,优先级: 视频源标题 > 番剧中文名 > 番剧日文名
-    getDanDanmaku(titleList, episodeFromTitle);
+    getDanDanmakuByBgmBangumiID(videoPageController.bangumiItem.id, episodeFromTitle);
     mediaPlayer = await createVideoController(offset: offset);
     playerSpeed =
         setting.get(SettingBoxKey.defaultPlaySpeed, defaultValue: 1.0);
+    aspectRatioType =
+        setting.get(SettingBoxKey.defaultAspectRatioType, defaultValue: 1);
     if (Utils.isDesktop()) {
       volume = volume != -1 ? volume : 100;
       await setVolume(volume);
@@ -219,6 +214,8 @@ abstract class _PlayerController with Store {
     superResolutionType =
         setting.get(SettingBoxKey.defaultSuperResolutionType, defaultValue: 1);
     hAenable = setting.get(SettingBoxKey.hAenable, defaultValue: true);
+    androidEnableOpenSLES =
+        setting.get(SettingBoxKey.androidEnableOpenSLES, defaultValue: true);
     hardwareDecoder =
         setting.get(SettingBoxKey.hardwareDecoder, defaultValue: 'auto-safe');
     autoPlay = setting.get(SettingBoxKey.autoPlay, defaultValue: true);
@@ -263,7 +260,11 @@ abstract class _PlayerController with Store {
     await pp.setProperty("af", "scaletempo2=max-speed=8");
     if (Platform.isAndroid) {
       await pp.setProperty("volume-max", "100");
-      await pp.setProperty("ao", "opensles");
+      if (androidEnableOpenSLES) {
+        await pp.setProperty("ao", "opensles");
+      } else {
+        await pp.setProperty("ao", "audiotrack");
+      }
     }
 
     await mediaPlayer.setAudioTrack(
@@ -435,11 +436,12 @@ abstract class _PlayerController with Store {
     forwardTime = time;
   }
 
-  Future<void> getDanDanmaku(List<String> titleList, int episode) async {
-    KazumiLogger().log(Level.info, '尝试获取弹幕 $titleList');
+  Future<void> getDanDanmakuByBgmBangumiID(
+      int bgmBangumiID, int episode) async {
+    KazumiLogger().log(Level.info, '尝试获取弹幕 [BgmBangumiID] $bgmBangumiID');
     try {
       danDanmakus.clear();
-      bangumiID = await DanmakuRequest.getBangumiIDByTitles(titleList);
+      bangumiID = await DanmakuRequest.getDanDanBangumiIDByBgmBangumiID(bgmBangumiID);
       var res = await DanmakuRequest.getDanDanmaku(bangumiID, episode);
       addDanmakus(res);
     } catch (e) {
